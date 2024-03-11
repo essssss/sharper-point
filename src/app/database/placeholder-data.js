@@ -102,3 +102,9 @@ const services = [
         cost: 105,
     },
 ];
+
+module.exports = {
+    providers,
+    customers,
+    services,
+};

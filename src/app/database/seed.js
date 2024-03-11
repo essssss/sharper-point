@@ -1,35 +1,39 @@
-const { db } = require("@vercel/postgres");
+const { Client } = require("pg");
 const {
     customers,
     services,
     providers,
     appointments,
-} = require("../app/lib/placeholder-data.js");
+} = require("./placeholder-data.js");
 const bcrypt = require("bcrypt");
 
 async function seedProviders(client) {
     try {
         // Create the "providers" table if it doesn't exist
-        const createTable = await client.sql`
+        const createTable = await client.query(`
       CREATE TABLE IF NOT EXISTS providers (
         id UUID PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL
       );
-    `;
+    `);
 
         console.log(`Created "providers" table`);
-
+        console.log(providers);
         // Insert data into the "providers" table
         const insertedProviders = await Promise.all(
             providers.map(async (provider) => {
                 const hashedPassword = await bcrypt.hash(provider.password, 10);
-                return client.sql`
+                console.log(hashedPassword);
+                return client.query(
+                    `
         INSERT INTO providers (id, name, email, password)
-        VALUES (${provider.id}, ${provider.name}, ${provider.email}, ${hashedPassword})
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (id) DO NOTHING;
-      `;
+      `,
+                    [provider.id, provider.name, provider.email, hashedPassword]
+                );
             })
         );
 
@@ -47,27 +51,30 @@ async function seedProviders(client) {
 
 async function seedCustomers(client) {
     try {
-        await client.sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+        await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
 
         // Create the "customers" table if it doesn't exist
-        const createTable = await client.sql`
+        const createTable = await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL
       );
-    `;
+    `);
 
         console.log(`Created "customers" table`);
 
         // Insert data into the "customers" table
         const insertedCustomers = await Promise.all(
-            customers.map(
-                (customer) => client.sql`
+            customers.map((customer) =>
+                client.query(
+                    `
         INSERT INTO customers (id, name, email)
-        VALUES (${customer.id}, ${customer.name}, ${customer.email})
+        VALUES ($1, $2, $3)
         ON CONFLICT (id) DO NOTHING;
-      `
+      `,
+                    [customer.id, customer.name, customer.email]
+                )
             )
         );
 
@@ -86,24 +93,26 @@ async function seedCustomers(client) {
 async function seedServices(client) {
     try {
         // Create the "services" table if it doesn't exist
-        const createTable = await client.sql`
+        const createTable = await client.query(`
       CREATE TABLE IF NOT EXISTS services (
         title VARCHAR(255) NOT NULL PRIMARY KEY,
         cost INTEGER NOT NULL        
       );
-    `;
+    `);
 
         console.log(`Created "services" table`);
 
         // Insert data into "services" table
         const insertedServices = await Promise.all(
-            services.map(
-                async (service) =>
-                    client.sql`
+            services.map(async (service) =>
+                client.query(
+                    `
 				INSERT INTO services (title, cost)
-				VALUES ( ${service.title}, ${service.cost})
+				VALUES ($1, $2)
 				ON CONFLICT (title) DO NOTHING;
-				`
+				`,
+                    [service.title, service.cost]
+                )
             )
         );
 
@@ -121,19 +130,20 @@ async function seedServices(client) {
 
 async function seedAppointments(client) {
     try {
-        await client.sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+        await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
         // Create the "appointments" table if it doesn't exist
-        const createAppointmentsTable = await client.sql`
+        const createAppointmentsTable = await client.query(`
 			CREATE TABLE IF NOT EXISTS appointments (
 				id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
 				customer_id UUID REFERENCES customers(id),
 				service_id UUID REFERENCES services(id),
 				provider_id UUID REFERENCES users(id),
-				appointment_datetime TIMESTAMP NOT NULL,
+				appointment_date DATE NOT NULL,
+				appointment_time TIME NOT NULL,
 				status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected', 'canceled'))
 			);
 		
-        `;
+        `);
 
         console.log(`Created "appointments" table`);
 
@@ -149,18 +159,24 @@ async function seedAppointments(client) {
 }
 
 async function main() {
-    const client = await db.connect();
+    const client = new Client({
+        user: "postgres",
+        host: "localhost",
+        database: "sharper_point",
+        port: 5432,
+    });
 
-    await seedProviders(client);
-    await seedCustomers(client);
-    await seedServices(client);
+    await client.connect();
 
-    await client.end();
+    try {
+        await seedProviders(client);
+        await seedCustomers(client);
+        await seedServices(client);
+    } catch (error) {
+        console.error("An error occurred while seeding the database:", error);
+    } finally {
+        await client.end();
+    }
 }
 
-main().catch((err) => {
-    console.error(
-        "An error occurred while attempting to seed the database:",
-        err
-    );
-});
+main();
