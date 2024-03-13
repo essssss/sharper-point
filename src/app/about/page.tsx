@@ -7,7 +7,7 @@ export default function Page() {
                 <div className="w-full flex-none md:w-48 ">
                     <SideNav />
                 </div>
-                <div className=" p-6 m-4 w-auto bg-gray-200 md:p-12">
+                <div className="rounded-xl p-6 m-4 md:w-4/5 bg-gray-50 md:p-12">
                     <div className="text-4xl font-bold">About me:</div>
                     <div className="p-3">
                         <p>

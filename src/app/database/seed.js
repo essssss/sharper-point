@@ -1,11 +1,11 @@
-const { Client } = require("pg");
-const {
+import { Client } from "pg";
+import {
     customers,
     services,
     providers,
     appointments,
-} = require("./placeholder-data.js");
-const bcrypt = require("bcrypt");
+} from "./placeholder-data.js";
+import { hash } from "bcrypt";
 
 async function seedProviders(client) {
     try {
@@ -24,7 +24,7 @@ async function seedProviders(client) {
         // Insert data into the "providers" table
         const insertedProviders = await Promise.all(
             providers.map(async (provider) => {
-                const hashedPassword = await bcrypt.hash(provider.password, 10);
+                const hashedPassword = await hash(provider.password, 10);
                 console.log(hashedPassword);
                 return client.query(
                     `
